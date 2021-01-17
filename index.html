@@ -1,0 +1,62 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h1>维纳过程</h1>
+    <p>维纳过程如下图所示，刷新页面可以重新生成。<br><canvas id="wiener_process" width="800" height="400"><canvas></p>
+    <p>生成方式：</p>
+<pre>
+function normalDistribution(mean, standardDeviation) {
+    // Box-Muller
+    let U1 = 1 - Math.random();
+    let U2 = 1 - Math.random();
+    let R = Math.sqrt(-2 * Math.log(U2));
+    let THETA = 2 * Math.PI * U1;
+    let Z = R * Math.cos(THETA);
+    return mean + (Z * standardDeviation);
+}
+function wienerProcess(x, mean, standardDeviation) {
+    return x + normalDistribution(mean, standardDeviation);
+}
+</pre>
+    <script>
+        function normalDistribution(mean, standardDeviation) {
+            // Box-Muller
+            let U1 = 1 - Math.random();
+            let U2 = 1 - Math.random();
+            let R = Math.sqrt(-2 * Math.log(U2));
+            let THETA = 2 * Math.PI * U1;
+            let Z = R * Math.cos(THETA);
+            return mean + (Z * standardDeviation);
+        }
+        function wienerProcess(x, mean, standardDeviation) {
+            return x + normalDistribution(mean, standardDeviation);
+        }
+        function draw(context2d, width, height, arrayDraw) {
+            let dx = width / arrayDraw.length;
+            let max = Math.max(...arrayDraw);
+            let min = Math.min(...arrayDraw);
+            let hei = max - min;
+            context2d.fillStyle = "#FFFFFF";
+            context2d.fillRect(0, 0, width, height);
+            context2d.lineWidth = 2;
+            context2d.strokeStyle = "black";
+            for (let i in arrayDraw) {
+                if (i == 0) {
+                    context2d.moveTo(i * dx, height * (1 - (arrayDraw[i] - min) / hei));
+                } else {
+                    context2d.lineTo(i * dx, height * (1 - (arrayDraw[i] - min) / hei));
+                }
+            }
+            context2d.stroke();
+        }
+
+        let sequence = [0];
+        for (let i = 1; i < 400; i++) {
+            sequence[i] = wienerProcess(sequence[i - 1], 0, 1);
+        }
+        draw(document.getElementById("wiener_process").getContext("2d"), 800, 400, sequence);
+    </script>
+</body>
+<html>
