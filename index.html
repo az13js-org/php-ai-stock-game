@@ -3,23 +3,17 @@
     <meta charset="UTF-8">
 </head>
 <body>
-    <h1>维纳过程</h1>
-    <p>维纳过程如下图所示，刷新页面可以重新生成。<br><canvas id="wiener_process" width="800" height="400"><canvas></p>
-    <p>生成方式：</p>
-<pre>
-function normalDistribution(mean, standardDeviation) {
-    // Box-Muller
-    let U1 = 1 - Math.random();
-    let U2 = 1 - Math.random();
-    let R = Math.sqrt(-2 * Math.log(U2));
-    let THETA = 2 * Math.PI * U1;
-    let Z = R * Math.cos(THETA);
-    return mean + (Z * standardDeviation);
-}
-function wienerProcess(x, mean, standardDeviation) {
-    return x + normalDistribution(mean, standardDeviation);
-}
-</pre>
+    <h1>随机模拟价格波动，蓝色线为AI操作</h1>
+    <div>
+        <p id="aibuysell" style="display:none">买入</p>
+        <p>AI资本：<span id="aivalue">1000.00</span></p>
+        <p>AI买入价格：<span id="aibuyprice"></span><br>AI卖出价格：<span id="aisellprice"></span></p>
+        <p>实时价格：<span id="price"></span>&nbsp;&nbsp;&nbsp;AI vs 人类&nbsp;:&nbsp;<span id="ai">1000.00</span>&nbsp;:&nbsp;<span id="human">1000.00</span></p>
+        <p>资本：<span id="value">1000.00</span></p>
+        <p>买入价格：<span id="buyprice"></span><br>卖出价格：<span id="sellprice"></span></p>
+        <button id="buysell" onclick="buyOrSell()">买入</button>
+    </div>
+    <p><canvas id="wiener_process" width="800" height="300"><canvas></p>
     <script>
         function normalDistribution(mean, standardDeviation) {
             // Box-Muller
@@ -33,30 +27,239 @@ function wienerProcess(x, mean, standardDeviation) {
         function wienerProcess(x, mean, standardDeviation) {
             return x + normalDistribution(mean, standardDeviation);
         }
-        function draw(context2d, width, height, arrayDraw) {
+        function draw(element, context2d, width, height, arrayDraw) {
             let dx = width / arrayDraw.length;
-            let max = Math.max(...arrayDraw);
-            let min = Math.min(...arrayDraw);
+            let max = arrayDraw[0].v;
+            let min = arrayDraw[0].v;
+            for (let item of arrayDraw) {
+                if (item.v < min) {
+                    min = item.v;
+                }
+                if (item.v > max) {
+                    max = item.v;
+                }
+            }
             let hei = max - min;
-            context2d.fillStyle = "#FFFFFF";
-            context2d.fillRect(0, 0, width, height);
+            element.width = element.width;
             context2d.lineWidth = 2;
             context2d.strokeStyle = "black";
+            context2d.beginPath();
             for (let i in arrayDraw) {
                 if (i == 0) {
-                    context2d.moveTo(i * dx, height * (1 - (arrayDraw[i] - min) / hei));
+                    context2d.moveTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
                 } else {
-                    context2d.lineTo(i * dx, height * (1 - (arrayDraw[i] - min) / hei));
+                    context2d.lineTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
                 }
             }
             context2d.stroke();
+            context2d.closePath();
+            // AI
+            context2d.strokeStyle = "blue";
+            context2d.lineWidth = 4;
+            context2d.beginPath();
+            let totalLength = arrayDraw.length;
+            for (let i = 0; i < totalLength; i++) {
+                if (0 == i) {
+                    if (arrayDraw[0].AIKeep && arrayDraw[1].AIKeep) {
+                        context2d.moveTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                    }
+                } else if (i == totalLength - 1) {
+                    if (arrayDraw[i].AIKeep && arrayDraw[i - 1].AIKeep) {
+                        context2d.lineTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                        context2d.stroke();
+                    }
+                } else {
+                    if (arrayDraw[i - 1].AIKeep == false && arrayDraw[i].AIKeep && arrayDraw[i + 1].AIKeep) {
+                        context2d.moveTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                    } else if (arrayDraw[i - 1].AIKeep && arrayDraw[i].AIKeep && arrayDraw[i + 1].AIKeep) {
+                        context2d.lineTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                    } else if (arrayDraw[i - 1].AIKeep && arrayDraw[i].AIKeep && arrayDraw[i + 1].AIKeep == false) {
+                        context2d.lineTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                        context2d.stroke();
+                    }
+                }
+            }
+            context2d.closePath();
+            // Player
+            context2d.lineWidth = 2;
+            context2d.strokeStyle = "red";
+            context2d.beginPath();
+            for (let i = 0; i < totalLength; i++) {
+                if (0 == i) {
+                    if (arrayDraw[0].playerKeep && arrayDraw[1].playerKeep) {
+                        context2d.moveTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                    }
+                } else if (i == totalLength - 1) {
+                    if (arrayDraw[i].playerKeep && arrayDraw[i - 1].playerKeep) {
+                        context2d.lineTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                        context2d.stroke();
+                    }
+                } else {
+                    if (arrayDraw[i - 1].playerKeep == false && arrayDraw[i].playerKeep && arrayDraw[i + 1].playerKeep) {
+                        context2d.moveTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                    } else if (arrayDraw[i - 1].playerKeep && arrayDraw[i].playerKeep && arrayDraw[i + 1].playerKeep) {
+                        context2d.lineTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                    } else if (arrayDraw[i - 1].playerKeep && arrayDraw[i].playerKeep && arrayDraw[i + 1].playerKeep == false) {
+                        context2d.lineTo(i * dx, height * (1 - (arrayDraw[i].v - min) / hei));
+                        context2d.stroke();
+                    }
+                }
+            }
+            context2d.closePath();
         }
 
-        let sequence = [0];
-        for (let i = 1; i < 400; i++) {
-            sequence[i] = wienerProcess(sequence[i - 1], 0, 1);
+        let points = 400; // 屏幕保持有多少个点
+        var delayTime = 100; // 延迟多少毫秒
+        var generate = 1; // 每次增量生成的数量
+
+        var sequence = [{
+            v: 250, // 初始价格
+            playerKeep: false,
+            AIKeep: false
+        }];
+        for (let i = 1; i < points; i++) { 
+            sequence[i] = {
+                v: wienerProcess(sequence[i - 1].v, 0, 1),
+                playerKeep: false,
+                AIKeep: false
+            };
         }
-        draw(document.getElementById("wiener_process").getContext("2d"), 800, 400, sequence);
+        var element = document.getElementById("wiener_process");
+        var context2d = element.getContext("2d");
+        var buyPriceElement = document.getElementById("buyprice");
+        var sellPriceElement = document.getElementById("sellprice");
+        var priceElement = document.getElementById("price");
+        var valueElement = document.getElementById("value");
+        var human = document.getElementById("human");
+        var button = document.getElementById("buysell");
+
+        priceElement.innerText = sequence[sequence.length - 1].v.toFixed(2);
+
+        function delayIncr() {
+            let len = sequence.length;
+            for (let i = 0; i < generate; i++) {
+                sequence[len] = {
+                    v: wienerProcess(sequence[len - 1].v, 0, 1),
+                    playerKeep: sellPriceElement.innerText == "" && buyPriceElement.innerText != "",
+                    AIKeep: AISellPriceElement.innerText == "" && AIBuyPriceElement.innerText != ""
+                };
+                sequence.shift();
+            }
+            draw(element, context2d, 800, 300, sequence);
+            priceElement.innerText = sequence[len - 1].v.toFixed(2);
+            ajaxSend();
+            let playerKeep = sellPriceElement.innerText == "" && buyPriceElement.innerText != "";
+            let AIKeep = AISellPriceElement.innerText == "" && AIBuyPriceElement.innerText != "";
+            let tmp;
+            if (playerKeep) {
+                tmp = parseFloat(valueElement.innerText) + parseFloat(priceElement.innerText);
+                human.innerText = tmp.toFixed(2);
+            } else {
+                human.innerText = valueElement.innerText;
+            }
+            if (AIKeep) {
+                tmp = parseFloat(AIValueElement.innerText) + parseFloat(priceElement.innerText);
+                ai.innerText = tmp.toFixed(2);
+            } else {
+                ai.innerText = AIValueElement.innerText;
+            }
+            setTimeout(delayIncr, delayTime);
+        }
+
+        draw(element, context2d, 800, 300, sequence);
+        setTimeout(delayIncr, delayTime);
+
+        function buyOrSell() {
+            const BUY_TEXT = "买入";
+            const SELL_TEXT = "卖出";
+            if (button.innerText == BUY_TEXT) {
+                buyPriceElement.innerText = priceElement.innerText;
+                sellPriceElement.innerText = "";
+                valueElement.innerText -= priceElement.innerText;
+                button.innerText = SELL_TEXT;
+            } else {
+                let price = priceElement.innerText;
+                sellPriceElement.innerText = price;
+                let num = parseFloat(price) + parseFloat(valueElement.innerText);
+                valueElement.innerText = num.toFixed(2);
+                button.innerText = BUY_TEXT;
+            }
+        }
+
+        var AIBuyPriceElement = document.getElementById("aibuyprice");
+        var AISellPriceElement = document.getElementById("aisellprice");
+        var AIValueElement = document.getElementById("aivalue");
+        var AIButton = document.getElementById("aibuysell");
+        var ai = document.getElementById("ai");
+        var AIOperationLock = false;
+
+        function AIBuyOrSell() {
+            const BUY_TEXT = "买入";
+            const SELL_TEXT = "卖出";
+            if (AIButton.innerText == BUY_TEXT) {
+                AIBuyPriceElement.innerText = priceElement.innerText;
+                AISellPriceElement.innerText = "";
+                AIValueElement.innerText -= priceElement.innerText;
+                AIButton.innerText = SELL_TEXT;
+            } else {
+                let price = priceElement.innerText;
+                AISellPriceElement.innerText = price;
+                let num = parseFloat(price) + parseFloat(AIValueElement.innerText);
+                AIValueElement.innerText = num.toFixed(2);
+                AIButton.innerText = BUY_TEXT;
+            }
+        }
+
+        function ajaxSend() {
+            if (AIOperationLock) {
+                return;
+            }
+            AIOperationLock = true;
+            let seq = [];
+            for (let x of sequence) {
+                seq.push(x.v.toFixed(2));
+            }
+            let xmlhttp = new XMLHttpRequest();
+            xmlhttp.onreadystatechange = function() {
+                if (xmlhttp.readyState == 4 && xmlhttp.status == 200) {
+                    let isKeep = AISellPriceElement.innerText == "" && AIBuyPriceElement.innerText != "";
+                    let response = JSON.parse(xmlhttp.responseText);
+                    // 训练的时候判断没写好，这里只能以同样方式判断操作逻辑。，。。
+                    if (isKeep) {
+                        var op = (response['keep'] - 0.5 * (response['sell'] + response['buy'])) < 0.000567;
+                    } else {
+                        var op = (response['keep'] - 0.5 * (parseFloat(response['sell']) + parseFloat(response['buy']))) < 0.000567;
+                    }
+                    if (op) {
+                        let l = sequence.length;
+                        let isKeep = AISellPriceElement.innerText == "" && AIBuyPriceElement.innerText != "";
+                        let lastOpTime = 0;
+                        for (i = l - 1; i > -1; i--) {
+                            if (sequence[i].AIKeep == isKeep) {
+                                lastOpTime++;
+                            } else {
+                                break;
+                            }
+                        }
+                        if (lastOpTime > 10) { // 限制AI在一定时间内不能高频操作。。。
+                            AIBuyOrSell();
+                        }
+                    }
+                    AIOperationLock = false;
+                }
+                if (xmlhttp.readyState == 4 && xmlhttp.status != 200) {
+                    console.log("Network error: " + xmlhttp.responseText + ", status=" + xmlhttp.status);
+                    AIOperationLock = false;
+                }
+            }
+            xmlhttp.open("POST", "api.php", true);
+            xmlhttp.setRequestHeader("Content-Type","application/json");
+            xmlhttp.send(JSON.stringify({
+                price: seq,
+                isKeep: AISellPriceElement.innerText == "" && AIBuyPriceElement.innerText != "",
+                buyPrice: AIBuyPriceElement.innerText != "" ? parseFloat(AIBuyPriceElement.innerText) : 0
+            }));
+        }
     </script>
 </body>
 <html>
